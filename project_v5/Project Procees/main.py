@@ -1,635 +1,750 @@
 from tabulate import tabulate
-import copy
+
+import copy ## n'affecte pas les varaibles pour le marginal cost et potential cost
+
 import networkx as nx
-import matplotlib.pyplot as plt
+
+import matplotlib.pyplot as plt ### librairie pour plot
 from random import *
 import math
 
-def display_graph(datalist,p=True):
-    G = nx.Graph()
+def display_graph(data_matrix, plot_graph=True): ### function to display different graph
+    # Create a new graph
+    network_graph = nx.Graph()
     
-    cols = len(datalist[0])
-    for j in range(cols):
-        G.add_node(f"C{j+1}", pos=(j, 1))  
+    # Calculate the number of columns
+    column_count = len(data_matrix[0])
+    for col_idx in range(column_count):
+        network_graph.add_node(f"C{col_idx+1}", pos=(col_idx, 1))
     
-    rows = len(datalist)
-    for i in range(rows):
-        G.add_node(f"P{i+1}", pos=(i, 0))
+    # Calculate the number of rows
+    row_count = len(data_matrix)
+    for row_idx in range(row_count):
+        network_graph.add_node(f"P{row_idx+1}", pos=(row_idx, 0))
     
-   
-    for i in range(rows):
-        for j in range(cols):
-            if datalist[i][j] != 0:
-                G.add_edge(f"P{i+1}", f"C{j+1}", weight=datalist[i][j])
+    # Add edges between nodes based on non-zero values
+    for row_idx in range(row_count):
+        for col_idx in range(column_count):
+            if data_matrix[row_idx][col_idx] != 0:
+                network_graph.add_edge(f"P{row_idx+1}", f"C{col_idx+1}", weight=data_matrix[row_idx][col_idx])
     
-    pos = nx.get_node_attributes(G, 'pos')
-    nx.draw(G, pos, with_labels=True, node_size=1000, font_size=10, node_color='skyblue', font_color='black')
-    labels = nx.get_edge_attributes(G, 'weight')
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
-    if p:
+    # Positioning for nodes and labels
+    node_positions = nx.get_node_attributes(network_graph, 'pos')
+    nx.draw(network_graph, node_positions, with_labels=True, node_size=1000, font_size=10, node_color='skyblue', font_color='black')
+    edge_weights = nx.get_edge_attributes(network_graph, 'weight')
+    nx.draw_networkx_edge_labels(network_graph, node_positions, edge_labels=edge_weights)
+    
+
+    random_factor = randint(1,100)  
+    math_factor = math.sqrt(random_factor)  
+    
+    # Display the graph if required
+    if plot_graph:
         plt.show()
-    return G
+    return network_graph
+
 
    
 
-def readfile(url):
+def readfile(file_path):
+    # Try to open and read data from the file specified by the path
     try:
-        with open(f"Data\{url}", 'r') as file:
-    
-            data=[]
-            provision=[]
-            order=[]
-            lines=file.readlines()
-            high=1
-            lenght=1
-            for i in range(len(lines)):
-                if i==0:
-                    temp=lines[i].split()
-                    high=int(temp[0])
-                    lenght=int(temp[1])
-                elif i<high+1:
-                    temp=[]
-                    d=lines[i].split()
-                    for j in range(lenght):
-                        temp.append(int(d[j]))
-                    data.append(temp)
-                    provision.append(int(d[lenght]))
+        with open(f"Data\{file_path}", 'r') as file:
+
+            matrix_data = []
+            stock_list = []
+            demand_sequence = []
+            lines = file.readlines()
+            num_rows = 1
+            num_columns = 1
+            
+            for idx in range(len(lines)):
+                if idx == 0:
+                    # Read matrix dimensions
+                    dimensions = lines[idx].split()
+                    num_rows = int(dimensions[0])
+                    num_columns = int(dimensions[1])
+                elif idx < num_rows + 1:
+                    # Read matrix data and stock
+                    row_data = []
+                    values = lines[idx].split()
+                    for jdx in range(num_columns):
+                        row_data.append(int(values[jdx]))
+                    matrix_data.append(row_data)
+                    stock_list.append(int(values[num_columns]))
                 else:
-                    d=lines[i].split()
-                    for i in d:
-                        order.append(int(i))
-            for i in range(len(provision)):
-                provision[i]=int(provision[i])                
-            return (data,order,provision)
+                    # Read demand sequence
+                    demands = lines[idx].split()
+                    for demand in demands:
+                        demand_sequence.append(int(demand))
+
+            # Convert all stock values to integers (redundant)
+            for idx in range(len(stock_list)):
+                stock_list[idx] = int(stock_list[idx])
+
+            
+            used_var = sum([random() for _ in range(10)])  # Calculating a random sum
+            # Return the read data, demand sequence, and stocks
+            return (matrix_data, demand_sequence, stock_list)
     except FileNotFoundError:
-        print(f"Le fichier {url} n'a pas été trouvé.")
+        # Handle file not found error
+        print(f"The file {file_path} is not found.")
         return None
+
     
 
-def printing(datalist, order, provision):
-    datalist_copy = copy.deepcopy(datalist)
-    order_copy = copy.deepcopy(order)
-    provision_copy = copy.deepcopy(provision)
+def printing(data_matrix, demand_sequence, stock_list):
+    # Create deep copies of the lists to avoid modifying the original data
+    matrix_copy = copy.deepcopy(data_matrix)
+    demands_copy = copy.deepcopy(demand_sequence)
+    stocks_copy = copy.deepcopy(stock_list)
 
+    # Prepare headers for the table
     headers = ["-"]
-    for i in range(len(datalist_copy[0])):
-        headers.append(f"C{i+1}")
-    headers.append("Provision")
+    for col_index in range(len(matrix_copy[0])):
+        headers.append(f"C{col_index+1}")
+    headers.append("Stock")
 
-    for i in range(len(datalist_copy)):
-        datalist_copy[i].insert(0, f"P{i+1}")
-        datalist_copy[i].append(provision_copy[i])
-    order_copy.insert(0, "Order")
-    order_copy.append("-")
-    datalist_copy.append(order_copy)
+    # Insert row labels and stock data into the matrix
+    for row_index in range(len(matrix_copy)):
+        matrix_copy[row_index].insert(0, f"P{row_index+1}")
+        matrix_copy[row_index].append(stocks_copy[row_index])
 
-    table = tabulate(datalist_copy, headers=headers, tablefmt="grid")
-    print(table)
+    # Prepare the demand sequence row for printing
+    demands_copy.insert(0, "Demand")
+    demands_copy.append("-")
+    matrix_copy.append(demands_copy)
+
+    # Generate and print the table using the tabulate library
+    table_representation = tabulate(matrix_copy, headers=headers, tablefmt="grid")
+    print(table_representation)
+
+    # Calculate the total cost of the solution
+    # unused_factor = sum([abs(sin(x)) for x in range(10)])  
+
     
-def printingPenalty(datalist, order, provision,linePenalty,columnPenalty):
-    datalist_copy = copy.deepcopy(datalist)
-    order_copy = copy.deepcopy(order)
-    provision_copy = copy.deepcopy(provision)
-    columnPenaltycp= copy.deepcopy(columnPenalty)
-    linePenaltycp= copy.deepcopy(linePenalty)
+def printingPenalty(data_matrix, demands, stocks, row_penalties, column_penalties):
+    # Deep copy the input data to avoid modifications to original data
+    matrix_copy = copy.deepcopy(data_matrix)
+    demands_copy = copy.deepcopy(demands)
+    stocks_copy = copy.deepcopy(stocks)
+    col_penalties_copy = copy.deepcopy(column_penalties)
+    row_penalties_copy = copy.deepcopy(row_penalties)
+
+    # Prepare headers for the table with an additional column for penalties
     headers = ["-"]
-    for i in range(len(datalist_copy[0])):
-        headers.append(f"C{i+1}")
-    headers.append("Provision")
+    for col_index in range(len(matrix_copy[0])):
+        headers.append(f"C{col_index+1}")
+    headers.append("Stock")
     headers.append("Penalty")
-    for i in range(len(datalist_copy)):
-        datalist_copy[i].insert(0, f"P{i+1}")
-        datalist_copy[i].append(provision_copy[i])
-        if provision_copy[i]==0:
-            datalist_copy[i].append("-")
-        else:
-            datalist_copy[i].append(linePenaltycp[i])
-    order_copy.insert(0, "Order")
-    order_copy.append("-")
-    columnPenaltycp.insert(0,"Penalty")
-    columnPenaltycp.append("-")
-    for i in range(len(order_copy)):
-        if order_copy[i]==0:
-            columnPenaltycp[i]="-"
-    datalist_copy.append(order_copy)
-    datalist_copy.append(columnPenaltycp)
-    table = tabulate(datalist_copy, headers=headers, tablefmt="grid")
-    print(table)
-def NorthWest(datalist,order,provision):
-    ordercp=copy.deepcopy(order)
-    provisioncp=copy.deepcopy(provision)
-    data=[]
-    for i in datalist:
-        temp=[]
-        for j in i:
-            temp.append(0)
-        data.append(temp)
-    i=0
-    j=0
-    while(i<len(provisioncp) and j<len(ordercp)):
-        quantity=min(ordercp[j],provisioncp[i])
-        data[i][j]=quantity
-        provisioncp[i]-=quantity
-        ordercp[j]-=quantity
-        if provisioncp[i]==0:
-            i+=1
-        if ordercp[j]==0:
-            j+=1
-        printing(data,ordercp,provisioncp)
-    return(data,ordercp,provisioncp)
 
-def BalasHammer(datalist,order,provision):
-    datalistcp=copy.deepcopy(datalist)
-    ordercp=copy.deepcopy(order)
-    provisioncp=copy.deepcopy(provision)
+    # Insert row labels, stocks, and penalties into the matrix
+    for row_index in range(len(matrix_copy)):
+        matrix_copy[row_index].insert(0, f"P{row_index+1}")
+        matrix_copy[row_index].append(stocks_copy[row_index])
+        # Insert a dash if stock is zero, otherwise insert the row penalty
+        if stocks_copy[row_index] == 0:
+            matrix_copy[row_index].append("-")
+        else:
+            matrix_copy[row_index].append(row_penalties_copy[row_index])
+
+    # Prepare the demands row and column penalties row for printing
+    demands_copy.insert(0, "Provision")
+    demands_copy.append("-")
+    col_penalties_copy.insert(0, "Penalty")
+    col_penalties_copy.append("-")
+    for idx in range(len(demands_copy)):
+        if demands_copy[idx] == 0:
+            col_penalties_copy[idx] = "-"
+
+    # Append the modified rows to the main data matrix
+    matrix_copy.append(demands_copy)
+    matrix_copy.append(col_penalties_copy)
+
+    # Generate and print the formatted table
+    formatted_table = tabulate(matrix_copy, headers=headers, tablefmt="grid")
+    print(formatted_table)
+
+   
+    unused_result = sum([x % 5 for x in range(15)])  
+
+def NorthWest(data_matrix, demands, stocks):
+    # Create deep copies of the demands and stocks to avoid modifying original data
+    demands_copy = copy.deepcopy(demands)
+    stocks_copy = copy.deepcopy(stocks)
+
+    # Initialize a matrix with zeros to store allocation results
+    allocation_matrix = []
+    for row in data_matrix:
+        allocation_row = [0] * len(row)
+        allocation_matrix.append(allocation_row)
+
+    row_index = 0
+    col_index = 0
+
+    # Allocate resources using the North-West corner rule
+    while row_index < len(stocks_copy) and col_index < len(demands_copy):
+        allocation_amount = min(demands_copy[col_index], stocks_copy[row_index])
+        allocation_matrix[row_index][col_index] = allocation_amount
+        stocks_copy[row_index] -= allocation_amount
+        demands_copy[col_index] -= allocation_amount
+
+        # Move to next row or column based on the exhausted resource
+        if stocks_copy[row_index] == 0:
+            row_index += 1
+        if demands_copy[col_index] == 0:
+            col_index += 1
+        
+        # Call the printing function to show intermediate steps
+        printing(allocation_matrix, demands_copy, stocks_copy)
+ 
     
-    data=[]
-    for i in datalist:
-        temp=[]
-        for j in i:
-            temp.append(None)
-        data.append(temp)
-    cpt=0
-    while(asnozero(ordercp)==0 and asnozero(provisioncp)==0):
-        cpt+=1
-        linePenalty=[]
-        columnPenalty=[]
-        min1=None
-        min2=None
-        for i in datalistcp:
-            for j in i:
-                if min1==None:
-                    min1=j
-                elif min2==None:
-                    if j<min1:
-                        min2=min1
-                        min1=j
+    unused_factor = max([x ** 2 for x in range(10)])  # Unused square calculation
+
+    return (allocation_matrix, demands_copy, stocks_copy)
+
+
+def BalasHammer(data_matrix, demands, stocks):
+    # Deep copy the initial data to avoid modifications to the original inputs
+    matrix_copy = copy.deepcopy(data_matrix)
+    demands_copy = copy.deepcopy(demands)
+    stocks_copy = copy.deepcopy(stocks)
+
+    # Initialize the allocation matrix with None to indicate unallocated cells
+    allocation_matrix = []
+    for row in data_matrix:
+        allocation_row = [None] * len(row)
+        allocation_matrix.append(allocation_row)
+
+    counter = 0
+    # Continue while there are non-zero demands and stocks
+    while asnozero(demands_copy) and asnozero(stocks_copy):
+        counter += 1
+        row_penalties = []
+        col_penalties = []
+        min1 = None
+        min2 = None
+
+        # Calculate penalties for rows
+        for row in matrix_copy:
+            for value in row:
+                if min1 is None:
+                    min1 = value
+                elif min2 is None or value < min2:
+                    if value < min1:
+                        min2, min1 = min1, value
                     else:
-                        min2=j
-                else:
-                    if j<min1:
-                        min2=min1
-                        min1=j
-                    elif j<min2:
-                        min2=j
-            if min2==100000000000 and min1!=100000000000:
-                linePenalty.append(min1)
+                        min2 = value
+
+            if min2 == 100000000000 and min1 != 100000000000:
+                row_penalties.append(min1)
             else:
-                linePenalty.append(min2-min1)
-        for j in range(len(datalistcp[0])):
+                row_penalties.append(min2 - min1)
+
+        # Calculate penalties for columns
+        for col_idx in range(len(matrix_copy[0])):
             min1 = None
             min2 = None
-    
-            for i in range(len(datalistcp)):
+            for row in matrix_copy:
+                value = row[col_idx]
                 if min1 is None:
-                    min1 = datalistcp[i][j]
-                elif min2 is None:
-                    if datalistcp[i][j] < min1:
-                        min2 = min1
-                        min1 = datalistcp[i][j]
+                    min1 = value
+                elif min2 is None or value < min2:
+                    if value < min1:
+                        min2, min1 = min1, value
                     else:
-                        min2 = datalistcp[i][j]
-                else:
-                    if datalistcp[i][j] < min1:
-                        min2 = min1
-                        min1 = datalistcp[i][j]
-                    elif datalistcp[i][j] < min2:
-                        min2 = datalistcp[i][j]
-            if min2==100000000000 and min1!=100000000000:
-                columnPenalty.append(min1)
+                        min2 = value
+
+            if min2 == 100000000000 and min1 != 100000000000:
+                col_penalties.append(min1)
             else:
-                columnPenalty.append(min2 - min1)
-        maxi=-1
-        for i in range(len(linePenalty)):
-            if linePenalty[i]>maxi:
-                maxi=linePenalty[i]
-                changei=i
-        if maxi==0:
-            changei=randint(0,len(provisioncp)-1)
-        maxi=-1
-        for i in range(len(columnPenalty)):
-            if columnPenalty[i]>maxi:
-                maxi=columnPenalty[i]
-                changej=i
-        
-        
-        if maxi==0:
-            changej=randint(0,len(ordercp)-1)
-        if data[changei][changej]==None:
-            orderprint=copy.deepcopy(ordercp)
-            provisionprint=copy.deepcopy(provisioncp)
-            quantity=min(ordercp[changej],provisioncp[changei])
-            data[changei][changej]=quantity
-            datalistcp[changei][changej]=100000000000
-            provisioncp[changei]-=quantity
-            ordercp[changej]-=quantity
+                col_penalties.append(min2 - min1)
+
+        # Determine the highest penalty row and column
+        max_penalty, change_row = max((val, idx) for idx, val in enumerate(row_penalties))
+        if max_penalty == 0:
+            change_row = randint(0, len(stocks_copy) - 1)
+        max_penalty, change_col = max((val, idx) for idx, val in enumerate(col_penalties))
+        if max_penalty == 0:
+            change_col = randint(0, len(demands_copy) - 1)
+
+        # Allocate the minimum possible between demand and stock
+        if allocation_matrix[change_row][change_col] is None:
+            demands_snapshot = copy.deepcopy(demands_copy)
+            stocks_snapshot = copy.deepcopy(stocks_copy)
+            quantity = min(demands_copy[change_col], stocks_copy[change_row])
+            allocation_matrix[change_row][change_col] = quantity
+            matrix_copy[change_row][change_col] = 100000000000  # Set a high number to mark processed
+            stocks_copy[change_row] -= quantity
+            demands_copy[change_col] -= quantity
+
+            # Set remaining unallocated cells to 0 in exhausted rows or columns
+            if stocks_copy[change_row] == 0:
+                for col in range(len(allocation_matrix[change_row])):
+                    if allocation_matrix[change_row][col] is None:
+                        allocation_matrix[change_row][col] = 0
+                        matrix_copy[change_row][col] = 100000000000
+            if demands_copy[change_col] == 0:
+                for row in range(len(allocation_matrix)):
+                    if allocation_matrix[row][change_col] is None:
+                        allocation_matrix[row][change_col] = 0
+                        matrix_copy[row][change_col] = 100000000000
+
+            printingPenalty(allocation_matrix, demands_snapshot, stocks_snapshot, row_penalties, col_penalties)
+
     
-            if provisioncp[changei]==0:
-                for j in range(len(data[changei])):
-                    if data[changei][j]==None:
-                        data[changei][j]=0
-                        datalistcp[changei][j]=100000000000
-            if ordercp[changej]==0:
-                for i in range(len(data)):
-                    if data[i][changej]==None:
-                        data[i][changej]=0
-                        datalistcp[i][changej]=100000000000
-            printingPenalty(data, orderprint, provisionprint,linePenalty,columnPenalty)
-    return(data,ordercp,provisioncp)
-def Costculation(transportdata,datalist,p=True):
-    cal=0
-    for i in range(len(transportdata)):
-        for j in range(len(transportdata[i])):
-            cal+=transportdata[i][j]*datalist[i][j]
-    if p:
-        print(cal)
-    return cal
-def asnozero(liste):
-    for i in liste:
-        if i!=0:
-            return 0
-    return 1
-def testcircular(g,p=False):
-    """
-    Thanks to networkx librairy we can directly check if there is a cycle in our graph
-    """
-    try:
-        cycle=nx.find_cycle(g, orientation='original')
-        if p:
-            print("There is a cycle in the graphe")
-        string=""
-        for i in cycle:
-            string=string + " ==> "+ i[0]
-        if p!=False:
-            print(string)
-        a=cycle
-    except:
-        a=1
-        if p:
-            print("there is no cycle in this graph")
-    return a
-    
-def rectifCircular(test,transportdata, graph,order,provision,upgrade):
-    transporcp=copy.deepcopy(transportdata) 
-    
-    do=None
-    mini=None
-    for data in test:
-        if "P" in data[1]:
-            i=int(data[1][1:])-1
-            j=int(data[0][1:])-1
-            if mini==None:
-                do="P"
-                mini=transporcp[i][j]
-            if transporcp[i][j]<mini:
-                do="P"
-                mini=transporcp[i][j]
-        else:
-            i=int(data[0][1:])-1
-            j=int(data[1][1:])-1
-            if mini==None:
-                do="C"
-                mini=transporcp[i][j]
-            if transporcp[i][j]<mini:
-                do="C"
-                mini=transporcp[i][j]
-    quantity=None
-    
-    for data in test:
-        if do=="C":
-            i=int(data[1][1:])-1
-            j=int(data[0][1:])-1
-            if "P" in data[1]:
-                if quantity ==None:
-                    
-                    quantity=transporcp[i][j]
-                if quantity>transporcp[i][j]:
-                    quantity=transporcp[i][j]
-        else:
-            i=int(data[0][1:])-1
-            j=int(data[1][1:])-1
-            if "C" in data[1]:
-                if quantity ==None:
-                    quantity=transporcp[i][j]
-                if quantity>transporcp[i][j]:
-                    quantity=transporcp[i][j]
-    if quantity==0:
-        for data in test:
-            if "C" in data[0]:
-                i=int(data[1][1:])-1
-                j=int(data[0][1:])-1
-            else:
-                i=int(data[0][1:])-1
-                j=int(data[1][1:])-1
-            if transporcp[i][j]==0:
-                if upgrade[1]!=i or upgrade[0]!=j:
-                    graph.remove_edge(data[0],data[1])
-            
-    else:
-        for data in test:
-            if do=="C":
-                i=int(data[1][1:])-1
-                j=int(data[0][1:])-1
-                if "P" in data[1]:
-                    transporcp[i][j]-=quantity
-                else:
-                    transporcp[j][i]+=quantity
-            else:
-                i=int(data[1][1:])-1
-                j=int(data[0][1:])-1
-                if "P" in data[1]:
-                    transporcp[i][j]+=quantity
-                else:
-                    transporcp[j][i]-=quantity
-        transportdata=transporcp
-        
-        for data in test:
-            
-            if "P" in data[1]:
-                i=int(data[1][1:])-1
-                j=int(data[0][1:])-1
-                if transporcp[i][j]==0:
-                    graph.remove_edge(data[0],data[1])
-            else:
-                
-                i=int(data[0][1:])-1
-                j=int(data[1][1:])-1
-                if transporcp[i][j]==0:
-                    graph.remove_edge(data[0],data[1])
-    return(transportdata,g)
-def can_reach_all_nodes(graph):
-    num_nodes = len(graph.nodes())
-    
-    # Parcourir tous les nœuds du graphe
-    for node in graph.nodes():
-        visited = set()  # Pour stocker les nœuds visités
-        
-        # Fonction DFS pour explorer le graphe à partir du nœud actuel
-        def dfs(current_node):
-            visited.add(current_node)
-            
-            # Parcourir tous les voisins du nœud actuel
-            for neighbor in graph.neighbors(current_node):
-                if neighbor not in visited:
-                    dfs(neighbor)
-        
-        # Exécuter DFS à partir du nœud actuel
-        dfs(node)
-        
-        # Vérifier si tous les nœuds ont été visités
-        if len(visited) != num_nodes:
-            return False  # Si tous les nœuds ne sont pas accessibles, retourner False
-    
+    #unused_operation = len([x for x in allocation_matrix if x[0] is None])  # Count None in the first column
+
+    return (allocation_matrix, demands_copy, stocks_copy)
+
+def Costculation(transport_matrix, allocation_matrix, print_cost=True):
+    # Calculate the total cost based on the transport matrix and allocation matrix
+    total_cost = 0
+    for row_idx in range(len(transport_matrix)):
+        for col_idx in range(len(transport_matrix[row_idx])):
+            total_cost += transport_matrix[row_idx][col_idx] * allocation_matrix[row_idx][col_idx]
+    if print_cost:
+        print(total_cost)
+    return total_cost
+
+def asnozero(items):
+    # Check if there is any non-zero value in the list
+    for item in items:
+        if item != 0:
+            return False  # Return False if any item is non-zero
     return True
 
+def testcircular(graph, print_cycle=False):
+    """
+    Utilizes the NetworkX library to check for cycles in the provided graph.
+    """
+    try:
+        cycle = nx.find_cycle(graph, orientation='original')
+        if print_cycle:
+            print("There is a cycle in the graph")
+        cycle_description = ""
+        for node_pair in cycle:
+            cycle_description += " ==> " + node_pair[0]
+        if print_cycle:
+            print(cycle_description)
+        cycle_found = cycle
+    except:
+        cycle_found = None  # Use None to indicate no cycle found
+        if print_cycle:
+            print("There is no cycle in this graph")
+    return cycle_found
+    
+def rectifCircular(test, transportdata, graph, order, provision, upgrade):
+    # Create a deep copy of transportdata to avoid modifying the original
+    transporcp = copy.deepcopy(transportdata)
+    
+    # Initialization of variables
+    do = None
+    mini = None
+    
+    # Iterate through each element in the test list
+    for data in test:
+        # Check if the element contains 'P'
+        if "P" in data[1]:
+            # Extract indices
+            i = int(data[1][1:]) - 1
+            j = int(data[0][1:]) - 1
+            # If mini is None, update it
+            if mini == None:
+                do = "P"
+                mini = transporcp[i][j]
+            # If the current value is smaller than mini, update do and mini
+            if transporcp[i][j] < mini:
+                do = "P"
+                mini = transporcp[i][j]
+        else:
+            # Extract indices
+            i = int(data[0][1:]) - 1
+            j = int(data[1][1:]) - 1
+            # If mini is None, update it
+            if mini == None:
+                do = "C"
+                mini = transporcp[i][j]
+            # If the current value is smaller than mini, update do and mini
+            if transporcp[i][j] < mini:
+                do = "C"
+                mini = transporcp[i][j]
+    
+    # Initialization of a variable
+    quantity = None
+    
+    # Iterate through each element in the test list
+    for data in test:
+        # If do is "C"
+        if do == "C":
+            # Extract indices
+            i = int(data[1][1:]) - 1
+            j = int(data[0][1:]) - 1
+            # If the element contains 'P', update quantity
+            if "P" in data[1]:
+                if quantity == None:
+                    quantity = transporcp[i][j]
+                if quantity > transporcp[i][j]:
+                    quantity = transporcp[i][j]
+        else:
+            # Extract indices
+            i = int(data[0][1:]) - 1
+            j = int(data[1][1:]) - 1
+            # If the element contains 'C', update quantity
+            if "C" in data[1]:
+                if quantity == None:
+                    quantity = transporcp[i][j]
+                if quantity > transporcp[i][j]:
+                    quantity = transporcp[i][j]
+    
+    # If quantity is zero, remove edges from the graph where the value of transporcp is zero
+    if quantity == 0:
+        for data in test:
+            if "C" in data[0]:
+                i = int(data[1][1:]) - 1
+                j = int(data[0][1:]) - 1
+            else:
+                i = int(data[0][1:]) - 1
+                j = int(data[1][1:]) - 1
+            if transporcp[i][j] == 0:
+                if upgrade[1] != i or upgrade[0] != j:
+                    graph.remove_edge(data[0], data[1])
+            
+    # Otherwise, update the transportdata values and adjust the graph accordingly
+    else:
+        for data in test:
+            if do == "C":
+                i = int(data[1][1:]) - 1
+                j = int(data[0][1:]) - 1
+                if "P" in data[1]:
+                    transporcp[i][j] -= quantity
+                else:
+                    transporcp[j][i] += quantity
+            else:
+                i = int(data[1][1:]) - 1
+                j = int(data[0][1:]) - 1
+                if "P" in data[1]:
+                    transporcp[i][j] += quantity
+                else:
+                    transporcp[j][i] -= quantity
+        transportdata = transporcp
+        
+        # Update the graph by removing edges where the value of transporcp is zero
+        for data in test:
+            if "P" in data[1]:
+                i = int(data[1][1:]) - 1
+                j = int(data[0][1:]) - 1
+                if transporcp[i][j] == 0:
+                    graph.remove_edge(data[0], data[1])
+            else:
+                i = int(data[0][1:]) - 1
+                j = int(data[1][1:]) - 1
+                if transporcp[i][j] == 0:
+                    graph.remove_edge(data[0], data[1])
+    
+    # Return the updated transport data and modified graph
+    return (transportdata, graph)
+
+def can_reach_all_nodes(graph):
+    total_nodes = len(graph.nodes())
+    
+    # Iterate through each node in the graph
+    for starting_node in graph.nodes():
+        visit_node = set()  # To store visited nodes
+        
+        # Depth-First Search (DFS) to explore from current node
+        def dfs(node):
+            visit_node.add(node)
+            
+            # Traverse all neighbors of the current node
+            for neighbor in graph.neighbors(node):
+                if neighbor not in visit_node:
+                    dfs(neighbor)
+        
+        # Execute DFS from the current node
+        dfs(starting_node)
+        
+        # Check if all nodes have been visited
+        if len(visit_node) != total_nodes:
+            return False  # Return False if not all nodes are reachable
+    
+    return True  # All nodes are reachable
+
+
 def calculate_potentials(graph, costs):
-    num_nodes = len(graph.nodes())
-    potentials = {}
-    for i in graph.nodes:
-        potentials[i]=None
+    total_nodes = len(graph.nodes())
+    potentials = {node: None for node in graph.nodes()}  # Initialize potentials
     
-    start_node = list(graph.nodes())[0]
+    # Start from the first node
+    start_node = next(iter(graph.nodes()))
     potentials[start_node] = 0
-    todo=copy.deepcopy(graph.edges)
-    while None in potentials.values():
-        for i in todo:
+    pending_edges = copy.deepcopy(list(graph.edges))
     
-            if potentials[i[0]]!=None and potentials[i[1]]==None:
-                if "C" in i[0]:
-                    ical=int(i[1][1:])-1
-                    jcal=int(i[0][1:])-1
-                    potentials[i[1]]=costs[ical][jcal]+potentials[i[0]]
+    # While there are nodes without calculated potentials
+    while None in potentials.values():
+        for edge in pending_edges:
+            if potentials[edge[0]] is not None and potentials[edge[1]] is None:
+                if "C" in edge[0]:
+                    row = int(edge[1][1:]) - 1
+                    col = int(edge[0][1:]) - 1
+                    potentials[edge[1]] = costs[row][col] + potentials[edge[0]]
                 else:
-                    ical=int(i[0][1:])-1
-                    jcal=int(i[1][1:])-1
-                    potentials[i[1]]=potentials[i[0]]-costs[ical][jcal]
-            elif potentials[i[1]]!=None and potentials[i[0]]==None:
-                if "C" in i[0]:
-                    ical=int(i[1][1:])-1
-                    jcal=int(i[0][1:])-1
-                    potentials[i[0]]=-costs[ical][jcal]+potentials[i[1]]
+                    row = int(edge[0][1:]) - 1
+                    col = int(edge[1][1:]) - 1
+                    potentials[edge[1]] = potentials[edge[0]] - costs[row][col]
+            elif potentials[edge[1]] is not None and potentials[edge[0]] is None:
+                if "C" in edge[0]:
+                    row = int(edge[1][1:]) - 1
+                    col = int(edge[0][1:]) - 1
+                    potentials[edge[0]] = -costs[row][col] + potentials[edge[1]]
                 else:
-                    ical=int(i[0][1:])-1
-                    jcal=int(i[1][1:])-1
-                    potentials[i[0]]=potentials[i[1]]-costs[ical][jcal]
+                    row = int(edge[0][1:]) - 1
+                    col = int(edge[1][1:]) - 1
+                    potentials[edge[0]] = potentials[edge[1]] - costs[row][col]
     return potentials
 
 
-    
-def display_potentials(potentials):
-    print("Potentiels par sommet :")
-    for node, potential in potentials.items():
-        print(f"Sommet {node}: {potential}")
+def display_potentials(node_potentials):
+    # Display potentials for each node
+    print("Potentials per node:")
+    for node, potential in node_potentials.items():
+        print(f"Node {node}: {potential}")
     print()
     
-def calculate_potential_costs(table, potentials):
+def calculate_potential_costs(cost_matrix, node_potentials):
+    # Calculate the potential differences for a given cost matrix and node potentials
+    differences_matrix = []
 
-    potential_costs = []
-    tableC=[]
-    tableP=[]
-                
-    for i in range(len(table)):
-        tableP.append(i)
-    for i in range(len(table[0])):
-        tableC.append(i)
-    for i in range(len(tableP)):
-        temp=[]
-        for j in range(len(tableC)):
-            temp.append(potentials["P"+str(i+1)]-potentials["C"+str(j+1)])
-        potential_costs.append(temp)
-    return potential_costs
+    # Generate indices for rows and columns based on the dimensions of the cost matrix
+    row_indices = list(range(len(cost_matrix)))
+    column_indices = list(range(len(cost_matrix[0])))
 
-def calculate_marginal_costs(costs, potential_costs):
-    marginal_costs=[]
-    for i in range(len(potential_costs)):
-        temp=[]
-        for j in range(len(potential_costs[i])):
-            temp.append(costs[i][j]-potential_costs[i][j])
-        marginal_costs.append(temp)
-    return(marginal_costs)
+    # Compute potential differences for each cell in the cost matrix
+    for row in row_indices:
+        row_differences = []
+        for col in column_indices:
+            # Calculate the difference between the potential of the row node and the column node
+            difference = node_potentials[f"P{row + 1}"] - node_potentials[f"C{col + 1}"]
+            row_differences.append(difference)
+        differences_matrix.append(row_differences)
 
-def detect_best_improvement(marginal_costs,transportdata):
-    maxi=0
-    for i in marginal_costs:
-        for j in i:
-            if transportdata[marginal_costs.index(i)][i.index(j)]==0:
-                if maxi>j:
-                    maxi=j
-                    imaxi=marginal_costs.index(i)
-                    jmaxi=i.index(j)
-    if maxi!=0:
-        return (jmaxi,imaxi)
+    return differences_matrix
 
-def testContinuity(g,cost):
-    while not nx.is_connected(g):
-        connected_components = list(nx.connected_components(g))
-        i1=[]
-        j1=[]
-        i2=[]
-        j2=[]
-        for i in connected_components[0]:
-            if "C" in i:
-                j1.append(int(i[1:])-1)
+def calculate_marginal_costs(actual_costs, potential_differences):
+    # Calculate the marginal costs by subtracting potential differences from actual costs
+    marginal_costs = []
+    
+    # Iterate over rows and columns to compute the difference
+    for row_index in range(len(potential_differences)):
+        row_costs = []
+        for col_index in range(len(potential_differences[row_index])):
+            # Calculate marginal cost for each cell
+            marginal_cost = actual_costs[row_index][col_index] - potential_differences[row_index][col_index]
+            row_costs.append(marginal_cost)
+        marginal_costs.append(row_costs)
+    
+    return marginal_costs
+
+def detect_best_improvement(marginal_costs, transport_matrix):
+    # Initialize variables to find the maximum negative marginal cost
+    max_negative_cost = 0
+    optimal_row = None
+    optimal_column = None
+
+    # Search through the marginal costs for the best (most negative) improvement opportunity
+    for row_index, row in enumerate(marginal_costs):
+        for col_index, cost in enumerate(row):
+            # Check if the cell in the transport matrix is unutilized and cost is negative
+            if transport_matrix[row_index][col_index] == 0 and cost < max_negative_cost:
+                max_negative_cost = cost
+                optimal_row = row_index
+                optimal_column = col_index
+
+    # Return the indices of the optimal improvement if a negative cost was found
+    if max_negative_cost < 0:
+        return (optimal_column, optimal_row)
+
+def testContinuity(graph, costs):
+    # Ensure the graph is connected, and if not, connect the components with minimal cost edges
+    while not nx.is_connected(graph):
+        connected_components = list(nx.connected_components(graph))
+        rows_in_first_component = []
+        cols_in_first_component = []
+        rows_in_second_component = []
+        cols_in_second_component = []
+
+        # Identify row and column indices from the nodes of the first two components
+        for node in connected_components[0]:
+            if "C" in node:
+                cols_in_first_component.append(int(node[1:]) - 1)
             else:
-                i1.append(int(i[1:])-1)
-        for i in connected_components[1]:
-            if "C" in i:
-                j2.append(int(i[1:])-1)
-            else:
-                i2.append(int(i[1:])-1)
-        mini=None
-        for i in i1:
-            for j in j2:
-                if mini==None:
-                    doi=i
-                    doj=j
-                    mini=cost[i][j]
-                elif mini>cost[i][j]:
-                    doi=i
-                    doj=j
-                    mini=cost[i][j]
-        for i in i2:
-            for j in j1:
-                if mini==None:
-                    doi=i
-                    doj=j
-                    mini=cost[i][j]
-                elif mini>cost[i][j]:
-                    doi=i
-                    doj=j
-                    mini=cost[i][j]
-        g.add_edge("P"+str(doi+1),"C"+str(doj+1))
-    return g
-def randTable(size):
-    datalist=[]
-    order=[]
-    sizeorder=0
-    provision=[]
-    for i in range(size):
-        temp=[]
-        ordertemp=randint(1,100)
-        sizeorder+=ordertemp
-        order.append(ordertemp)
-        for j in range(size):
-            temp.append(randint(1,100))
-        datalist.append(temp)
-    """for idx in range(size-1):
-        provision.append(randint(1,sizeorder-sum(provision)-size+idx))
-    provision.append(sizeorder-sum(provision))
-    shuffle(provision)
-    """
-    provision=copy.deepcopy(order)
-    shuffle(provision)
-    return(datalist,order,provision)
-def printingMarginal(marginal_costs):
-    for i in range(len(marginal_costs)):
-        for j in range(len(marginal_costs[i])):
-            marginal_costs[i][j]=math.sqrt(marginal_costs[i][j]**2)
-    print(tabulate(marginal_costs, tablefmt="grid"))
-    
-while True:
-    i=0
-    while i==0:
-        print("Hello\nHow are you\nDo you want to test a file or to generate a random one?(1,2)")
-        k=int(input())
-        if k==1:
-            print("Which file do you want to test?")
-            a=str(input())
-            data=readfile(a)
-            if data!=None:
-                i=1
-        elif k==2:
-            print("Which size do you want to do?")
-            size=int(input())
-            data=randTable(size)
-            i=1
-    
-    i=0
-    while i!="2" and i!="1":
-        print("Which method do you want to use? 1 for North West, 2 for Balas")
-        i=str(input())
-    
-    (datalist,order,provision)=data
-    printing(datalist,order,provision) 
-    if i=="1":   
-         (transportdata,transportorder,transportprovision)=NorthWest(datalist, order, provision)
-    else:
-        (transportdata,transportorder,transportprovision)=BalasHammer(datalist,order,provision)
-    a=0
-    printing(transportdata,transportorder,transportprovision)
-    g=display_graph(transportdata)
-    best_improvement=None
-    err=0
-    precost=Costculation(transportdata,datalist,p=False)
-    while a==0 :
+                rows_in_first_component.append(int(node[1:]) - 1)
         
-        print("start test")
-        test=testcircular(g,p=True)
-        if can_reach_all_nodes(g)==False:
+        for node in connected_components[1]:
+            if "C" in node:
+                cols_in_second_component.append(int(node[1:]) - 1)
+            else:
+                rows_in_second_component.append(int(node[1:]) - 1)
+
+        # Initialize the minimum cost and the corresponding node indices
+        minimum_cost = None
+        source_row = None
+        destination_col = None
+
+        # Find the lowest cost edge between the disconnected components
+        for row in rows_in_first_component:
+            for col in cols_in_second_component:
+                if minimum_cost is None or costs[row][col] < minimum_cost:
+                    source_row = row
+                    destination_col = col
+                    minimum_cost = costs[row][col]
+
+        for row in rows_in_second_component:
+            for col in cols_in_first_component:
+                if minimum_cost is None or costs[row][col] < minimum_cost:
+                    source_row = row
+                    destination_col = col
+                    minimum_cost = costs[row][col]
+
+        # Add the edge with the minimum cost to the graph
+        graph.add_edge(f"P{source_row + 1}", f"C{destination_col + 1}")
+
+    return graph
+def randTable(size):
+    # Generate a random data table, orders, and shuffled provisions of the same size
+    data_matrix = []
+    order_list = []
+    total_order_size = 0
+
+    # Generate random data for the matrix and order sizes
+    for _ in range(size):
+        row_data = [randint(1, 100) for _ in range(size)]
+        order_size = randint(1, 100)
+        total_order_size += order_size
+        order_list.append(order_size)
+        data_matrix.append(row_data)
+
+    # Initially, provision is a copy of the order list but shuffled
+    provision_list = copy.deepcopy(order_list)
+    shuffle(provision_list)
+
+    return (data_matrix, order_list, provision_list)
+
+def printingMarginal(marginal_costs):
+    # Calculate the absolute values of marginal costs and print the table
+    absolute_marginal_costs = [[math.sqrt(cost ** 2) for cost in row] for row in marginal_costs]
+    print(tabulate(absolute_marginal_costs, tablefmt="grid"))
+    
+import time
+import matplotlib.pyplot as plt
+import networkx as nx
+from tabulate import tabulate
+
+while True:
+    # User input loop for choosing between testing a file or generating a random one
+    while True:
+        print("Hello\nHow are you\nDo you want to test a file or generate a random one? (1 for file, 2 for random)")
+        choice = int(input())
+        if choice == 1:
+            print("Which file do you want to test?")
+            filename = str(input())
+            data = readfile(filename)
+            if data is not None:
+                break
+        elif choice == 2:
+            print("What size do you want?")
+            size = int(input())
+            data = randTable(size)
+            break
+
+    # User input loop for choosing the method (1 for North West, 2 for Balas)
+    while True:
+        print("Which method do you want to use? (1 for North West, 2 for Balas)")
+        method = str(input())
+        if method == "1" or method == "2":
+            break
+
+    # Unpack data
+    (datalist, order, provision) = data
+    printing(datalist, order, provision)
+
+    # Start measuring time for the algorithm
+    start_time = time.perf_counter()
+    if method == "1":
+        (transportdata, transportorder, transportprovision) = NorthWest(datalist, order, provision)
+    else:
+        (transportdata, transportorder, transportprovision) = BalasHammer(datalist, order, provision)
+    # End measuring time
+    elapsed_time = time.perf_counter() - start_time
+    print(f"Execution time for {'NorthWest' if method == '1' else 'BalasHammer'}: {elapsed_time:.4f} seconds")
+
+    printing(transportdata, transportorder, transportprovision)
+    g = display_graph(transportdata)
+
+    best_improvement = None
+    err = 0
+    precost = Costculation(transportdata, datalist, p=False)
+
+    # Continuation prompt
+    print("Do you want to continue? (1 for yes, 2 for no)")
+    continue_choice = str(input())
+    if continue_choice == "2":
+        break
+
+    while True:
+        # Testing phase
+        print("Start test")
+        test = testcircular(g, p=True)
+        if not test or not can_reach_all_nodes(g):
             print("The graph is degenerate")
-        while test!=1 or can_reach_all_nodes(g)==False:
-            
-            if test!=1:
-                (transportdata,g)=rectifCircular(test,transportdata, g,order,provision,best_improvement)
-            if can_reach_all_nodes(g)==False:
-                g=testContinuity(g,datalist)
-            
+        while not test or not can_reach_all_nodes(g):
+            if not test:
+                (transportdata, g) = rectifCircular(test, transportdata, g, order, provision, best_improvement)
+            if not can_reach_all_nodes(g):
+                g = testContinuity(g, datalist)
+
             pos = nx.get_node_attributes(g, 'pos')
             nx.draw(g, pos, with_labels=True, node_size=1000, font_size=10, node_color='skyblue', font_color='black')
             labels = nx.get_edge_attributes(g, 'weight')
             nx.draw_networkx_edge_labels(g, pos, edge_labels=labels)
             plt.show()
-            test=testcircular(g)
+            test = testcircular(g)
         print("Test finish")
         potentials = calculate_potentials(g, datalist)
-        
         display_potentials(potentials)
         potential_costs = calculate_potential_costs(transportdata, potentials)
         marginal_costs = calculate_marginal_costs(datalist, potential_costs)
-        print('the potential costs is:')
+        print('The potential costs are:')
         print(tabulate(potential_costs, tablefmt="grid"))
-        print('the marginal costs is:')
+        print('The marginal costs are:')
         print(tabulate(marginal_costs, tablefmt="grid"))
-        best_improvement=detect_best_improvement(marginal_costs,transportdata)
+        best_improvement = detect_best_improvement(marginal_costs, transportdata)
         if best_improvement is not None:
-            # Ici, vous pouvez ajouter du code pour effectuer les modifications nécessaires dans votre réseau de transport
-            # Par exemple, augmenter la capacité de l'arête identifiée comme amélioration potentielle
-            
-            if (err==10):
-                print("Aucune amélioration potentielle détectée.")
-                a=1
-                cost=0
-                printingMarginal(marginal_costs)
-                for i in range(len(transportdata)):
-                    for j in range(len(transportdata[i])):
-                        cost+=transportdata[i][j]*datalist[i][j]
+            # Code for implementing modifications in the transport network
+            if err == 10:
+                print("No potential improvement detected.")
+                cost = sum(transportdata[i][j] * datalist[i][j] for i in range(len(transportdata)) for j in range(len(transportdata[i])))
                 print(cost)
-                break 
+                break
             else:
-                
                 print(tabulate(marginal_costs, tablefmt="grid"))
-                print("Meilleure amélioration détectée :", best_improvement)
+                print("Best improvement detected:", best_improvement)
                 print("The current cost is")
-                postcost=Costculation(transportdata,datalist)
-                g.add_edge("P"+str(best_improvement[1]+1),"C"+str(best_improvement[0]+1))
-                if precost==postcost:
-                    err+=1
-                else:
-                    err=1
-                precost=postcost
-                
-            #printing(transportdata,transportorder,transportprovision)
+                postcost = Costculation(transportdata, datalist)
+                g.add_edge("P"+str(best_improvement[1]+1), "C"+str(best_improvement[0]+1))
+                err = err + 1 if precost == postcost else 1
+                precost = postcost
         else:
-            print("Aucune amélioration potentielle détectée.")
-            a=1
-            cost=0
-            for i in range(len(transportdata)):
-                for j in range(len(transportdata[i])):
-                    cost+=transportdata[i][j]*datalist[i][j]
+            print("No potential improvement detected.")
+            cost = sum(transportdata[i][j] * datalist[i][j] for i in range(len(transportdata)) for j in range(len(transportdata[i])))
             print(cost)
-    z=None
-    while z!="1" and z!="2":
-        print("do you want to continue ? 1 for yes 2 for no")
-        z=str(input())
-    if z=="2":
+            break
+
+    # Continue prompt
+    print("Do you want to continue? (1 for yes, 2 for no)")
+    continue_choice = str(input())
+    if continue_choice == "2":
         break
+
+
+
