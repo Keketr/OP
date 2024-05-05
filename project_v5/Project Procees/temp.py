@@ -1,17 +1,17 @@
 import os
 
-# Définir le chemin du répertoire où créer les dossiers
+# Define the directory path where the folders will be created
 path = os.getcwd()
 
-# Itérer sur les numéros de 1 à 12
+# Iterate over numbers from 1 to 12
 for i in range(1, 13):
-    # Créer le nom du dossier avec le numéro actuel
+    # Create the folder name with the current number
     folder_name = f"INTG6_traces_{i}"
 
-    # Vérifier si le dossier existe déjà
+    # Check if the folder already exists
     if not os.path.exists(folder_name):
-        # Créer le dossier s'il n'existe pas
+        # Create the folder if it doesn't exist
         os.makedirs(folder_name)
-        print(f"Dossier créé : {folder_name}")
+        print(f"Folder created: {folder_name}")
     else:
-        print(f"Le dossier '{folder_name}' existe déjà.")
+        print(f"The folder '{folder_name}' already exists.")
