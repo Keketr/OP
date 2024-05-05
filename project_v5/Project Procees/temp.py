@@ -6,7 +6,7 @@ path = os.getcwd()
 # Iterate over numbers from 1 to 12
 for i in range(1, 13):
     # Create the folder name with the current number
-    folder_name = f"INTG6_traces_{i}"
+    folder_name = f"INTG8_traces_{i}"
 
     # Check if the folder already exists
     if not os.path.exists(folder_name):
