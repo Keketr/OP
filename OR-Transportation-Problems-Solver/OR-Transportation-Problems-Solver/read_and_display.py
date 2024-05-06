@@ -111,7 +111,7 @@ def printingPenalty(datalist, order, provision,linePenalty,columnPenalty):
 
 # Display the result of the potentials per node    
 def display_potentials(potentials):
-    print("Potentiels par sommet :")
+    print("Potentials per edges :")
     for node, potential in potentials.items():
-        print(f"Sommet {node}: {potential}")
+        print(f"Edge {node}: {potential}")
     print()
