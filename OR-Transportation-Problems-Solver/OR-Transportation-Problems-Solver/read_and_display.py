@@ -54,7 +54,7 @@ def readfile(file_number):
                 provision[i]=int(provision[i])                
             return (data,order,provision)
     except FileNotFoundError:
-        print(f"Le fichier {file_number} n'a pas été trouvé.")
+        print(f"The file {file_number} is not found.")
         return None
     
 # Display with tabulate by giving data (cost or proposal), order and provision
